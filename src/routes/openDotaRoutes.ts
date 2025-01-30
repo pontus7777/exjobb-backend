@@ -1,13 +1,13 @@
-import express, { Request, Response, NextFunction } from 'express'
-import axios from 'axios'
-import { Hero } from '../models/Hero'
-import { CONFIG } from '../config/enviroment'
-import { PlayerSearchResults } from '../models/PlayerSearchResults'
+import express, { Request, Response, NextFunction } from "express";
+import axios from "axios";
+import { Hero } from "../models/Hero";
+import { CONFIG } from "../config/enviroment";
+import { PlayerSearchResults } from "../models/PlayerSearchResults";
 
-const router = express.Router()
+const router = express.Router();
 
 // Base URL for the Dota API (read from environment variables)
-const baseUrl = CONFIG.DOTA_API_BASE_URL
+const baseUrl = CONFIG.DOTA_API_BASE_URL;
 
 // Route to fetch heroes
 /**
@@ -20,18 +20,70 @@ const baseUrl = CONFIG.DOTA_API_BASE_URL
  *       200:
  *         description: if successful returns an array of all heroes in the game.
  */
-router.get('/heroes', async (req: Request, res: Response, next: NextFunction) => {
+router.get(
+  "/heroes",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Fetch data from the external API
+      const response = await axios.get(`${baseUrl}/heroes`);
+      const heroes: Hero[] = response.data; // Ensure the data conforms to the Hero interface
+
+      res.status(200).json(heroes); // Respond with the heroes data
+    } catch (error) {
+      console.error("Error fetching heroes:", error);
+      next(error); // Pass the error to the next middleware
+    }
+  }
+);
+/**
+ * @swagger
+ * /api/v1/heroStats:
+ *   get:
+ *     summary: List of all Dota heroes
+ *     description: Gets an array list of all heroes in dota2.
+ *     responses:
+ *       200:
+ *         description: if successful returns an array of all heroes in the game.
+ */
+router.get(
+  "/heroStats",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Fetch data from the external API
+      const response = await axios.get(`${baseUrl}/heroStats`);
+      const heroes: HeroStats[] = response.data; // Ensure the data conforms to the Hero interface
+
+      res.status(200).json(heroes); // Respond with the heroes data
+    } catch (error) {
+      console.error("Error fetching heroes:", error);
+      next(error); // Pass the error to the next middleware
+    }
+  }
+);
+
+// Route to fetch heroes
+/**
+ * @swagger
+ * /api/v1/live:
+ *   get:
+ *     summary: List of all Dota heroes
+ *     description: Gets an array list top currently ongoing live games in dota2.
+ *     responses:
+ *       200:
+ *         description: if successful returns an array of all heroes in the game.
+ */
+router.get("/live", async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Fetch data from the external API
-    const response = await axios.get(`${baseUrl}/heroes`)
-    const heroes: Hero[] = response.data // Ensure the data conforms to the Hero interface
+    const response = await axios.get(`${baseUrl}/live`);
+    const heroes: LiveMatchData[] = response.data; // Ensure the data conforms to the Hero interface
 
-    res.status(200).json(heroes) // Respond with the heroes data
+    res.status(200).json(heroes); // Respond with the heroes data
   } catch (error) {
-    console.error('Error fetching heroes:', error)
-    next(error) // Pass the error to the next middleware
+    console.error("Error fetching heroes:", error);
+    next(error); // Pass the error to the next middleware
   }
-})
+});
 
 /**
  * @swagger
@@ -79,28 +131,31 @@ router.get('/heroes', async (req: Request, res: Response, next: NextFunction) =>
  *       500:
  *         description: Internal server error
  */
-router.get('/search', async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    // Retrieve query parameters (e.g., player name, match ID, etc.)
-    const query = req.query.q as string // 'q' is the search query (can be player name, match ID, etc.)
+router.get(
+  "/search",
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      // Retrieve query parameters (e.g., player name, match ID, etc.)
+      const query = req.query.q as string; // 'q' is the search query (can be player name, match ID, etc.)
 
-    if (!query) {
-      res.status(400).json({ error: 'Query parameter "q" is required' })
+      if (!query) {
+        res.status(400).json({ error: 'Query parameter "q" is required' });
+      }
+
+      // Build the URL for the OpenDota API search endpoint
+      const url = `${baseUrl}/search?q=${encodeURIComponent(query)}`;
+
+      // Make the request to the OpenDota API
+      const response = await axios.get<PlayerSearchResults[]>(url); // Use the PlayerSearchResults interface here
+
+      // Return the search results from OpenDota API
+      res.status(200).json(response.data);
+    } catch (error) {
+      console.error("Error during OpenDota search:", error);
+      next(error); // Pass the error to the next middleware (e.g., error handler)
     }
-
-    // Build the URL for the OpenDota API search endpoint
-    const url = `${baseUrl}/search?q=${encodeURIComponent(query)}`
-
-    // Make the request to the OpenDota API
-    const response = await axios.get<PlayerSearchResults[]>(url) // Use the PlayerSearchResults interface here
-
-    // Return the search results from OpenDota API
-    res.status(200).json(response.data)
-  } catch (error) {
-    console.error('Error during OpenDota search:', error)
-    next(error) // Pass the error to the next middleware (e.g., error handler)
   }
-})
+);
 
 /**
  * @swagger
@@ -141,25 +196,31 @@ router.get('/search', async (req: Request, res: Response, next: NextFunction) =>
  *       500:
  *         description: Internal server error if the API request fails.
  */
-router.get('/rankings', async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  try {
-    const { hero_id } = req.query
+router.get(
+  "/rankings",
+  async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    try {
+      const { hero_id } = req.query;
 
-    if (!hero_id) {
-      res.status(400).json({ error: 'hero_id is required' })
-      return
+      if (!hero_id) {
+        res.status(400).json({ error: "hero_id is required" });
+        return;
+      }
+
+      const response = await axios.get(
+        "https://api.opendota.com/api/rankings",
+        {
+          params: { hero_id },
+        }
+      );
+
+      res.status(200).json(response.data);
+    } catch (error) {
+      console.error("Error fetching rankings:", error);
+      next(error); // Pass error to Express's error handler
     }
-
-    const response = await axios.get('https://api.opendota.com/api/rankings', {
-      params: { hero_id },
-    })
-
-    res.status(200).json(response.data)
-  } catch (error) {
-    console.error('Error fetching rankings:', error)
-    next(error) // Pass error to Express's error handler
   }
-})
+);
 
 /**
  * @swagger
@@ -185,39 +246,43 @@ router.get('/rankings', async (req: Request, res: Response, next: NextFunction):
  *         description: Internal server error
  */
 router.get(
-  '/distributions',
+  "/distributions",
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
-      const response = await axios.get('https://api.opendota.com/api/distributions')
-      res.status(200).json(response.data)
+      const response = await axios.get(
+        "https://api.opendota.com/api/distributions"
+      );
+      res.status(200).json(response.data);
     } catch (error) {
-      console.error('Error fetching distributions:', error)
-      next(error) // Pass the error to the Express error handler
+      console.error("Error fetching distributions:", error);
+      next(error); // Pass the error to the Express error handler
     }
   }
-)
+);
 
 router.get(
-  '/heroes/:hero',
+  "/heroes/:hero",
   async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const { hero } = req.params // Extract hero from the URL parameters
+    const { hero } = req.params; // Extract hero from the URL parameters
 
     try {
       // Make the API request to OpenDota
-      const response = await axios.get(`https://api.opendota.com/api/heroes/${hero}`)
-      res.status(200).json(response.data) // Send the OpenDota API response to the client
+      const response = await axios.get(
+        `https://api.opendota.com/api/heroes/${hero}`
+      );
+      res.status(200).json(response.data); // Send the OpenDota API response to the client
     } catch (error) {
-      console.error(`Error fetching hero data for ${hero}:`, error)
+      console.error(`Error fetching hero data for ${hero}:`, error);
       if (axios.isAxiosError(error) && error.response) {
         res.status(error.response.status).json({
           error: error.response.data,
           message: `Failed to fetch data for hero: ${hero}`,
-        })
+        });
       } else {
-        next(error) // Pass the error to the Express error handler
+        next(error); // Pass the error to the Express error handler
       }
     }
   }
-)
+);
 
-export default router
+export default router;
